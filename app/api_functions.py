@@ -1,5 +1,3 @@
-# from flask import Flask
-# from app import app, db
 import requests
 from googleapiclient.discovery import build
 import subprocess
@@ -238,22 +236,24 @@ class ApiFunc():
         except Exception as e:
             print(f"Ошибка при получении трека: {e}")
             return None
-    
-
-    @staticmethod
-    def _make_api_request(self, method, params=None):
-        """Базовый метод для API запросов"""
-        if params is None:
-            params = {}
-
-        params.update({"access_token": self.access_token, "v": self.api_version})
-
-        response = requests.get(f"https://api.vk.com/method/{method}", params=params)
-        return response.json()
  
 
     @staticmethod
-    def search_audio(self, query, count=30):
+    def search_vk_audio(query, count=30):
+        access_token = '36d92ccd36d92ccd36d92ccd4735e82a9d336d936d92ccd5ef9cdfd4d84cf454655d72d'
+        api_version = '5.199'
+
+
+        def _make_api_request(method, params=None):
+            """Базовый метод для API запросов"""
+            if params is None:
+                params = {}
+
+            params.update({"access_token": access_token, "v": api_version})
+
+            response = requests.get(f"https://api.vk.com/method/{method}", params=params)
+            return response.json()
+
         """Поиск аудио по названию"""
         params = {
             "q": query,
@@ -267,7 +267,21 @@ class ApiFunc():
 
 
     @staticmethod
-    def search_video(query, count=30):
+    def search_vk_video(query, count=30):
+        access_token = '36d92ccd36d92ccd36d92ccd4735e82a9d336d936d92ccd5ef9cdfd4d84cf454655d72d'
+        api_version = '5.199'
+
+
+        def _make_api_request(method, params=None):
+            """Базовый метод для API запросов"""
+            if params is None:
+                params = {}
+
+            params.update({"access_token": access_token, "v": api_version})
+
+            response = requests.get(f"https://api.vk.com/method/{method}", params=params)
+            return response.json()
+
         """Поиск видео по названию"""
         params = {
             "q": query,
@@ -277,57 +291,90 @@ class ApiFunc():
         }
 
         result = _make_api_request("video.search", params)
-        return result.get("response", {}).get("items", [])
+        return result.get("response", {}).get("items", [])        
 
 
     @staticmethod
-    def parse_vk_url(self, url):
-        parsed = urlparse(url)
+    def get_vk_audio_by_id(owner_id, audio_id):
+        access_token = '36d92ccd36d92ccd36d92ccd4735e82a9d336d936d92ccd5ef9cdfd4d84cf454655d72d'
+        api_version = '5.199'
 
-        audio_match = re.match(r"/audio(\d+)_(\d+)", parsed.path)
-        if audio_match:
-            return {
-                "type": "audio",
-                "owner_id": audio_match.group(1),
-                "id": audio_match.group(2),
-            }
+        def _make_api_request(method, params=None):
+            """Базовый метод для API запросов"""
+            if params is None:
+                params = {}
 
-        video_match = re.match(r"/video(\d+)_(\d+)", parsed.path)
-        if video_match:
-            return {
-                "type": "video",
-                "owner_id": video_match.group(1),
-                "id": video_match.group(2),
-            }
+            params.update({"access_token": access_token, "v": api_version})
 
-        query = parse_qs(parsed.query)
-        if "z" in query:
-            z_match = re.match(r"video(\d+)_(\d+)", query["z"][0])
-            if z_match:
-                return {
-                    "type": "video",
-                    "owner_id": z_match.group(1),
-                    "id": z_match.group(2),
-                }
+            response = requests.get(f"https://api.vk.com/method/{method}", params=params)
+            return response.json()
 
-        return None
-
-
-    @staticmethod
-    def get_audio_by_id(self, owner_id, audio_id):
         params = {"audios": f"{owner_id}_{audio_id}"}
 
         result = _make_api_request("audio.getById", params)
         return result.get("response", [])[0] if result.get("response") else None
 
     @staticmethod
-    def get_video_by_id(self, owner_id, video_id):
+    def get_vk_video_by_id(owner_id, video_id):
+        access_token = '36d92ccd36d92ccd36d92ccd4735e82a9d336d936d92ccd5ef9cdfd4d84cf454655d72d'
+        api_version = '5.199'
+
+
+        def _make_api_request(method, params=None):
+            """Базовый метод для API запросов"""
+            if params is None:
+                params = {}
+
+            params.update({"access_token": access_token, "v": api_version})
+
+            response = requests.get(f"https://api.vk.com/method/{method}", params=params)
+            return response.json()
+
         params = {"videos": f"{owner_id}_{video_id}"}
 
         result = _make_api_request("video.get", params)
         return result.get("response", {}).get("items", [None])[0]
 
+    @staticmethod
+    def download_tiktok_video(url):
+        try:
+            # Проверяем URL
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+                
+            domain = urlparse(url).netloc
+            if 'tiktok.com' not in domain:
+                raise ValueError("Это не ссылка на TikTok!")
 
+            # Создаем папку для загрузок
+            download_folder = os.path.join(os.path.expanduser("~"), "Desktop", "TikTok_Downloads")
+            os.makedirs(download_folder, exist_ok=True)
+
+            # Команда для скачивания через yt-dlp с конвертацией в AVC
+            command = [
+        'yt-dlp',
+        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+        '--recode-video', 'mov',  # Перекодируем в MOV
+        '--merge-output-format', 'mov',  # Объединяем в MOV
+        '-o', os.path.join(download_folder, '%(title)s.%(ext)s'),
+        '--no-warnings',
+        url
+    ]
+            result = subprocess.run(command, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                print("Видео успешно скачано в формате MP4 (AVC)!")
+                for line in result.stderr.split('\n'):
+                    if 'Destination:' in line:
+                        file_path = line.split('Destination:')[-1].strip()
+                        print(f"Файл сохранен: {file_path}")
+                        return file_path
+            else:
+                print("Ошибка при скачивании:")
+                print(result.stderr)
+                
+        except Exception as e:
+            print(f"Произошла ошибка: {str(e)}")
 
 
 
