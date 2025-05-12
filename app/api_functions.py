@@ -273,7 +273,6 @@ class ApiFunc():
 
 
         def _make_api_request(method, params=None):
-            """Базовый метод для API запросов"""
             if params is None:
                 params = {}
 
@@ -282,7 +281,6 @@ class ApiFunc():
             response = requests.get(f"https://api.vk.com/method/{method}", params=params)
             return response.json()
 
-        """Поиск видео по названию"""
         params = {
             "q": query,
             "count": count,
@@ -300,7 +298,6 @@ class ApiFunc():
         api_version = '5.199'
 
         def _make_api_request(method, params=None):
-            """Базовый метод для API запросов"""
             if params is None:
                 params = {}
 
@@ -321,7 +318,6 @@ class ApiFunc():
 
 
         def _make_api_request(method, params=None):
-            """Базовый метод для API запросов"""
             if params is None:
                 params = {}
 
@@ -338,7 +334,6 @@ class ApiFunc():
     @staticmethod
     def download_tiktok_video(url):
         try:
-            # Проверяем URL
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
                 
@@ -377,16 +372,234 @@ class ApiFunc():
             print(f"Произошла ошибка: {str(e)}")
 
 
+    @staticmethod
+    def search_vk_audio_v2(query, count=30):
+        """Альтернативный метод поиска аудио"""
+        try:
+            print(f"\n=== Начинаем поиск аудио по запросу: '{query}' ===")
+            
+            access_token = '36d92ccd36d92ccd36d92ccd4735e82a9d336d936d92ccd5ef9cdfd4d84cf454655d72d'
+            api_version = '5.199'
+            
+            params = {
+                "q": query,
+                "count": count,
+                "access_token": access_token,
+                "v": api_version
+            }
+            
+            print("Параметры запроса:", params)
+            
+            response = requests.get("https://api.vk.com/method/audio.search", params=params)
+            data = response.json()
+            
+            print("Полный ответ от API:", data)
+            
+            if 'error' in data:
+                print(f"Ошибка API: {data['error']}")
+                return []
+                
+            if 'response' not in data:
+                print("Некорректный формат ответа - отсутствует 'response'")
+                return []
+                
+            items = data['response'].get('items', [])
+            print(f"Найдено {len(items)} аудиозаписей")
+            
+            results = []
+            for item in items:
+                try:
+                    result = {
+                        'id': item['id'],
+                        'owner_id': item['owner_id'],
+                        'title': item['title'],
+                        'artist': item['artist'],
+                        'duration': item['duration'],
+                        'url': f"https://vk.com/audio{item['owner_id']}_{item['id']}"
+                    }
+                    results.append(result)
+                    print(f"Добавлена аудиозапись: {result['title']} - {result['artist']}")
+                except KeyError as e:
+                    print(f"Ошибка в структуре аудиозаписи: отсутствует ключ {e}")
+                    continue
+                    
+            return results
+            
+        except Exception as e:
+            print(f"Исключение при поиске аудио: {str(e)}")
+            return []
 
+    @staticmethod
+    def search_vk_video_v2(query, count=30):
+        """Альтернативный метод поиска видео"""
+        try:
+            print(f"\n=== Начинаем поиск видео по запросу: '{query}' ===")
+            
+            access_token = '36d92ccd36d92ccd36d92ccd4735e82a9d336d936d92ccd5ef9cdfd4d84cf454655d72d'
+            api_version = '5.199'
+            
+            params = {
+                "q": query,
+                "count": count,
+                "access_token": access_token,
+                "v": api_version,
+                "adult": 0
+            }
+            
+            print("Параметры запроса:", params)
+            
+            response = requests.get("https://api.vk.com/method/video.search", params=params)
+            data = response.json()
+            
+            print("Полный ответ от API:", data)
+            
+            if 'error' in data:
+                print(f"Ошибка API: {data['error']}")
+                return []
+                
+            if 'response' not in data:
+                print("Некорректный формат ответа - отсутствует 'response'")
+                return []
+                
+            items = data['response'].get('items', [])
+            print(f"Найдено {len(items)} видеозаписей")
+            
+            results = []
+            for item in items:
+                try:
+                    # Получаем лучшее доступное изображение
+                    image = item.get('photo_800') or item.get('photo_640') or item.get('photo_320') or ''
+                    
+                    result = {
+                        'id': item['id'],
+                        'owner_id': item['owner_id'],
+                        'title': item['title'],
+                        'duration': item['duration'],
+                        'views': item.get('views', 0),
+                        'image': image,
+                        'url': f"https://vk.com/video{item['owner_id']}_{item['id']}"
+                    }
+                    results.append(result)
+                    print(f"Добавлено видео: {result['title']} ({result['duration']} сек.)")
+                except KeyError as e:
+                    print(f"Ошибка в структуре видео: отсутствует ключ {e}")
+                    continue
+                    
+            return results
+            
+        except Exception as e:
+            print(f"Исключение при поиске видео: {str(e)}")
+            return []
+        
 
+    @staticmethod
+    def download_media(url, media_type="video", format="mp4"):
+        """Универсальный метод для скачивания медиа с YouTube и Яндекс.Музыки"""
+        if 'yandex' in url.lower():
+            return ApiFunc.download_yandex_track(url, format)
+        else:
+            return ApiFunc.download_youtube_media(url, media_type, format)
 
+    @staticmethod
+    def download_yandex_track(url, format="mp3"):
+        """Скачивание трека из Яндекс.Музыки"""
+        try:
+            # Инициализация клиента
+            client = Client().init()
+            
+            # Парсим ID трека
+            track_id = ApiFunc._parse_yandex_track_id(url)
+            if not track_id:
+                return {"success": False, "error": "Invalid Yandex Music URL"}
 
-aboba = ApiFunc()
-# print(aboba.parse_youtube_videos_by_name('aboba'))
-# print(aboba.find_youtube_video_by_url('https://www.youtube.com/watch?v=DKZFf_iERGQ&abobasasasas'))
-print(ApiFunc.download_media(
-    "https://www.youtube.com/watch?v=m6m7rCPUPoI",
-    media_type="audio",
-    format="mp3"
-))
-# print(ApiFunc.find_yandex_music_track_by_url('https://music.yandex.ru/album/10195467/track/63858863?utm_source=web&utm_medium=copy_link'))
+            # Получаем информацию о треке
+            track = client.tracks([track_id])[0]
+            if not track:
+                return {"success": False, "error": "Track not found"}
+
+            # Получаем ссылку на скачивание
+            download_info = track.get_download_info()
+            best_quality = max(
+                [d for d in download_info if d.codec == 'mp3'],
+                key=lambda x: x.bitrate_in_kbps
+            )
+            download_url = best_quality.get_direct_link()
+
+            # Скачиваем файл
+            download_dir = str(Path.home() / "Downloads" / "YandexMusic")
+            os.makedirs(download_dir, exist_ok=True)
+            
+            filename = f"{track.title} - {track.artists[0].name}.{format}"
+            filename = ApiFunc._sanitize_filename(filename)
+            filepath = os.path.join(download_dir, filename)
+
+            response = requests.get(download_url, stream=True)
+            if response.status_code == 200:
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(1024):
+                        f.write(chunk)
+                return {"success": True, "path": filepath}
+            else:
+                return {"success": False, "error": f"Download failed: {response.status_code}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    def _parse_yandex_track_id(url):
+        """Парсинг ID трека из URL Яндекс.Музыки"""
+        try:
+            parts = url.split('/')
+            track_part = [p for p in parts if p.startswith('track')]
+            if not track_part:
+                return None
+            return track_part[0].replace('track', '')
+        except:
+            return None
+
+    @staticmethod
+    def _sanitize_filename(filename):
+        """Очистка имени файла от недопустимых символов"""
+        invalid_chars = '<>:"/\\|?*'
+        for char in invalid_chars:
+            filename = filename.replace(char, '_')
+        return filename
+
+    @staticmethod
+    def download_youtube_media(url, media_type="video", format="mp4"):
+        """Скачивание медиа с YouTube"""
+        try:
+            download_dir = str(Path.home() / "Downloads")
+            os.makedirs(download_dir, exist_ok=True)
+
+            ydl_opts = {
+                'outtmpl': f'{download_dir}/%(title)s.%(ext)s',
+                'quiet': False,
+                'retries': 3,
+                'socket_timeout': 30,
+                'force_ipv4': True,
+                'no_check_certificate': True,
+            }
+
+            if media_type == "video":
+                ydl_opts['format'] = f'bestvideo[ext={format}]+bestaudio[ext=m4a]/best[ext={format}]'
+                ydl_opts['merge_output_format'] = format
+            else:
+                ydl_opts['format'] = 'bestaudio/best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': format,
+                    'preferredquality': '320',
+                }]
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                
+                if media_type == "audio":
+                    filename = os.path.splitext(filename)[0] + f".{format}"
+
+                return {"success": True, "path": filename}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
