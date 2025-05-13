@@ -4,7 +4,7 @@ import subprocess
 import os
 from pathlib import Path
 import yt_dlp
-from yandex_music import Client
+import yandex_music
 import json
 import time
 import re
@@ -12,93 +12,6 @@ from tqdm import tqdm
 from urllib.parse import urlparse, parse_qs
 
 class ApiFunc():
-
-    @staticmethod
-    def download_media(url, media_type="video", format="mp4", quality="best"):
-        """
-        Улучшенный метод скачивания с обходом ограничений YouTube
-        """
-        download_dir = str(Path.home() / "Downloads")
-        ydl_opts = {
-            'outtmpl': f'{download_dir}/%(title)s.%(ext)s',
-            'quiet': False,
-            'retries': 3,
-            'socket_timeout': 30,
-            'force_ipv4': True,
-            'no_check_certificate': True,
-            'http_chunk_size': 10485760,
-            'extractor_args': {
-                'youtube': {
-                    'skip': ['dash', 'hls'],
-                    'player_skip': ['config', 'webpage']
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.youtube.com/',
-            },
-            'proxy': '',  # Можно добавить прокси при необходимости
-        }
-
-        # Альтернативные варианты форматов
-        format_selectors = {
-            'video': {
-                'mp4': 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]',
-                'webm': 'bv*[ext=webm]+ba[ext=webm]/b[ext=webm]'
-            },
-            'audio': {
-                'mp3': 'ba/b',
-                'wav': 'ba/b'
-            }
-        }
-
-        try:
-            # Пробуем разные варианты форматов
-            for attempt in range(3):
-                try:
-                    if media_type == "video":
-                        ydl_opts['format'] = format_selectors['video'].get(format, 'bv*+ba/b')
-                        if format == "mp4":
-                            ydl_opts['merge_output_format'] = 'mp4'
-                    else:
-                        ydl_opts['format'] = format_selectors['audio'].get(format, 'ba/b')
-                        if format == "mp3":
-                            ydl_opts['postprocessors'] = [{
-                                'key': 'FFmpegExtractAudio',
-                                'preferredcodec': 'mp3',
-                                'preferredquality': '320',
-                            }]
-                        elif format == "wav":
-                            ydl_opts['postprocessors'] = [{
-                                'key': 'FFmpegExtractAudio',
-                                'preferredcodec': 'wav',
-                            }]
-
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        info = ydl.extract_info(url, download=True)
-                        filename = ydl.prepare_filename(info)
-
-                        if media_type == "audio":
-                            filename = os.path.splitext(filename)[0] + f".{format}"
-
-                        return filename
-
-                except yt_dlp.DownloadError as e:
-                    print(f"Попытка {attempt + 1} не удалась: {str(e)}")
-                    if "HTTP Error 429" in str(e):
-                        # Меняем User-Agent при блокировке
-                        ydl_opts['http_headers'][
-                            'User-Agent'] = f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{91 + attempt}.0.4472.124 Safari/537.36'
-                    time.sleep(5)  # Пауза между попытками
-                    continue
-
-        except Exception as e:
-            print(f"Критическая ошибка: {type(e).__name__}: {e}")
-
-        return None
-
-
 
     @staticmethod
     def parse_youtube_videos_by_name(video_name):
@@ -184,7 +97,7 @@ class ApiFunc():
 
     @staticmethod
     def parse_yandex_tracks_by_name(name):
-        client = Client().init()
+        client = yandex_music.Client().init()
 
         response = (client.search(name, type_='track')).to_json()
 
@@ -211,7 +124,7 @@ class ApiFunc():
 
     @staticmethod
     def find_yandex_music_track_by_url(url):
-        client = Client().init()
+        client =yandex_music.Client().init()
 
         album_id = url.lstrip('https://music.yandex.ru/album/')
         track_place = album_id.find('/track')
@@ -504,8 +417,11 @@ class ApiFunc():
     def download_yandex_track(url, format="mp3"):
         """Скачивание трека из Яндекс.Музыки"""
         try:
+
+            access_token = 'y0__xDC8Jb4BRje-AYg08OajxM45uJyGnjSe0Kry7GoLASPymIZMg'
+
             # Инициализация клиента
-            client = Client().init()
+            client = yandex_music.Client(access_token).init()
             
             # Парсим ID трека
             track_id = ApiFunc._parse_yandex_track_id(url)
@@ -526,7 +442,7 @@ class ApiFunc():
             download_url = best_quality.get_direct_link()
 
             # Скачиваем файл
-            download_dir = str(Path.home() / "Downloads" / "YandexMusic")
+            download_dir = str(Path.home() / "Downloads")
             os.makedirs(download_dir, exist_ok=True)
             
             filename = f"{track.title} - {track.artists[0].name}.{format}"
@@ -549,11 +465,11 @@ class ApiFunc():
     def _parse_yandex_track_id(url):
         """Парсинг ID трека из URL Яндекс.Музыки"""
         try:
-            parts = url.split('/')
-            track_part = [p for p in parts if p.startswith('track')]
-            if not track_part:
-                return None
-            return track_part[0].replace('track', '')
+            track_id = url.lstrip('https://music.yandex.ru/album/')
+            track_place = track_id.find('/track')
+            track_id = (track_id[track_place:track_id.find('?') if '?' in track_id else None]).lstrip('/track')
+            print(track_id)
+            return track_id
         except:
             return None
 
@@ -569,11 +485,10 @@ class ApiFunc():
     def download_youtube_media(url, media_type="video", format="mp4"):
         """Скачивание медиа с YouTube"""
         try:
-            download_dir = str(Path.home() / "Downloads")
-            os.makedirs(download_dir, exist_ok=True)
+            download_dir = os.path.join(os.path.expanduser("~"), "Downloads")
 
             ydl_opts = {
-                'outtmpl': f'{download_dir}/%(title)s.%(ext)s',
+                'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'retries': 3,
                 'socket_timeout': 30,
@@ -593,8 +508,7 @@ class ApiFunc():
                 }]
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
+                ydl.download([url])
                 
                 if media_type == "audio":
                     filename = os.path.splitext(filename)[0] + f".{format}"
@@ -603,3 +517,25 @@ class ApiFunc():
 
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    # import os
+    # import yt_dlp
+    # @staticmethod
+    # def download_video(url):
+    #     # Path where the video will be saved (Downloads folder)
+    #     downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+
+    #     # Options for yt-dlp
+    #     ydl_opts = {
+    #         'format': 'best',
+    #         'outtmpl': os.path.join(downloads_path, '%(title)s.%(ext)s'),
+    #     }
+
+    #     try:
+    #         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    #             print(f"Downloading video: {url}")
+    #             ydl.download([url])
+    #             print("Download completed!")
+        
+    #     except Exception as e:
+    #         print(f"Error: {e}")

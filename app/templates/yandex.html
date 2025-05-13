@@ -81,7 +81,7 @@ $(document).ready(function() {
     function downloadMedia(url, type) {
         const button = $(`.download-btn[data-url="${url}"]`);
         const originalText = button.text();
-        
+    
         button.prop('disabled', true).text('Скачивание...');
         
         $.post('/api/download', {
