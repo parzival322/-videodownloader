@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}YouTube Search{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <h2 class="mb-4">Поиск на YouTube</h2>
+    <div class="input-group mb-4">
+        <input type="text" id="searchQuery" class="form-control" placeholder="Введите название видео...">
+        <button id="searchBtn" class="btn btn-danger">Поиск</button>
+    </div>
+
+    <div class="mb-3">
+        <div class="btn-group w-100" role="group">
+            <button type="button" class="btn btn-outline-danger active" id="searchVideosBtn">
+                Поиск видео
+            </button>
+            <button type="button" class="btn btn-outline-danger" id="searchChannelBtn">
+                Поиск по каналу
+            </button>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#filtersCollapse">
+                Фильтры поиска <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse" id="filtersCollapse">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Канал</label>
+                        <input type="text" id="channelFilter" class="form-control" placeholder="Название канала">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Год</label>
+                        <select id="yearFilter" class="form-select">
+                            <option value="">Любой год</option>
+                            {% for year in range(2023, 2004, -1) %}
+                            <option value="{{ year }}">{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Длительность</label>
+                        <select id="durationFilter" class="form-select">
+                            <option value="">Любая</option>
+                            <option value="short">Короткая (< 4 мин)</option>
+                            <option value="medium">Средняя (4-20 мин)</option>
+                            <option value="long">Длинная (> 20 мин)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Сортировка</label>
+                        <select id="sortFilter" class="form-select">
+                            <option value="relevance">По релевантности</option>
+                            <option value="date">По дате</option>
+                            <option value="viewCount">По просмотрам</option>
+                            <option value="rating">По рейтингу</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="trending-container mb-5" id="trendingSection">
+        <h3 class="mb-3">Трендовые видео</h3>
+        <div id="trendingContainer" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            <!-- Трендовые видео будут здесь -->
+        </div>
+    </div>
+
+    <div id="resultsContainer">
+        <!-- Результаты поиска будут здесь -->
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Загружаем трендовые видео при загрузке страницы
+    loadTrendingVideos();
+
+    let currentSearchMode = 'videos';
+
+    $('#searchChannelBtn').click(function() {
+        currentSearchMode = 'channel';
+        $(this).addClass('active');
+        $('#searchVideosBtn').removeClass('active');
+        $('#searchQuery').attr('placeholder', 'Название канала...');
+        // Скрываем фильтр канала
+        $('#channelFilter').closest('.col-md-4').addClass('filter-transition').slideUp();
+    });
+    
+    $('#searchVideosBtn').click(function() {
+        currentSearchMode = 'videos';
+        $(this).addClass('active');
+        $('#searchChannelBtn').removeClass('active');
+        $('#searchQuery').attr('placeholder', 'Название видео...');
+        // Показываем фильтр канала
+        $('#channelFilter').closest('.col-md-4').addClass('filter-transition').slideDown();
+    });
+
+    // Инициализация при загрузке
+    if(currentSearchMode === 'channel') {
+            $('#channelFilter').closest('.col-md-4').hide();
+        };
+    
+    function loadTrendingVideos() {
+        $('#trendingContainer').html('<div class="col-12 text-center py-4"><div class="spinner-border text-danger" role="status"><span class="visually-hidden">Загрузка...</span></div></div>');
+        
+        $.get('/api/youtube/trending', function(data) {
+            let html = '';
+            if(data && data.length > 0) {
+                data.forEach(video => {
+                    html += `
+                    <div class="col">
+                        <div class="card h-100">
+                            <a href="${video.video_url}" target="_blank">
+                                <img src="${video.video_thumbnails.medium.url}" class="card-img-top">
+                            </a>
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a href="${video.video_url}" target="_blank">${video.video_title}</a>
+                                </h5>
+                                <p class="card-text text-muted">${video.channel_title}</p>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <button class="btn btn-sm btn-danger download-btn" 
+                                    data-url="${video.video_url}" data-type="video">
+                                    <i class="bi bi-download"></i> MP4
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger download-btn ms-2" 
+                                    data-url="${video.video_url}" data-type="audio">
+                                    <i class="bi bi-music-note-beamed"></i> MP3
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html = '<div class="col-12 text-center py-4">Не удалось загрузить трендовые видео</div>';
+            }
+            $('#trendingContainer').html(html);
+            bindDownloadButtons();
+        }).fail(function() {
+            $('#trendingContainer').html('<div class="col-12 text-center py-4">Ошибка при загрузке трендовых видео</div>');
+        });
+    }
+
+    $('#searchBtn').click(searchYouTube);
+    $('#searchQuery').keypress(function(e) {
+        if(e.which == 13) searchYouTube();
+    });
+
+    function searchYouTube() {
+        const query = $('#searchQuery').val().trim();
+        if(!query) {
+            loadTrendingVideos();
+            return;
+        }
+
+        $('#trendingSection').hide();
+        $('#resultsContainer').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-danger" role="status"></div>
+                <p class="mt-2">Ищем ${currentSearchMode === 'channel' ? 'канал' : 'видео'}...</p>
+            </div>
+        `);
+
+        const endpoint = currentSearchMode === 'channel' 
+            ? '/api/youtube/channel' 
+            : '/api/youtube/search/filtered';
+            
+        const params = {
+            q: query,
+            channel: currentSearchMode === 'videos' ? $('#channelFilter').val().trim() : undefined,
+            year: $('#yearFilter').val(),
+            duration: $('#durationFilter').val(),
+            sort: $('#sortFilter').val()
+        };
+
+        // Удаляем undefined параметры
+        Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+        $.get(endpoint, params, function(data) {
+            let html = '';
+            if(data && data.length > 0) {
+                data.forEach(video => {
+                    html += `
+                    <div class="card media-card mb-3">
+                        <div class="row g-0">
+                            <div class="col-md-4">
+                                <a href="${video.video_url}" target="_blank">
+                                    <img src="${video.video_thumbnails.high.url}" class="img-fluid rounded-start">
+                                </a>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="${video.video_url}" target="_blank">${video.video_title}</a>
+                                    </h5>
+                                    <p class="card-text">
+                                        <small class="text-muted">${video.channel_title}</small><br>
+                                        <small>${video.video_views} просмотров</small>
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <a href="${video.video_url}" class="btn btn-outline-danger" target="_blank">Открыть в YouTube</a>
+                                        <div>
+                                            <button class="btn btn-danger download-btn" 
+                                                data-url="${video.video_url}" data-type="video">
+                                                Скачать MP4
+                                            </button>
+                                            <button class="btn btn-secondary download-btn ms-2" 
+                                                data-url="${video.video_url}" data-type="audio">
+                                                Скачать MP3
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html = '<div class="text-center py-4">Ничего не найдено</div>';
+            }
+
+            $('#resultsContainer').html(html);
+            bindDownloadButtons();
+        }).fail(function() {
+            $('#resultsContainer').html('<div class="alert alert-danger">Ошибка при выполнении поиска</div>');
+        });
+    }
+
+    // Остальной код без изменений
+    function bindDownloadButtons() {
+        $('.download-btn').click(function() {
+            const url = $(this).data('url');
+            const type = $(this).data('type');
+            downloadMedia(url, type);
+        });
+    }
+
+    function downloadMedia(url, type) {
+        const format = type === 'video' ? 'mp4' : 'mp3';
+        const button = $(`.download-btn[data-url="${url}"][data-type="${type}"]`);
+        const originalText = button.html();
+        
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Скачивание...');
+        
+        $.post('/api/download', {
+            url: url,
+            type: type,
+            format: format
+        }, function(response) {
+            if(response.success) {
+                button.html('<i class="bi bi-check-circle"></i> Скачано!');
+                setTimeout(() => {
+                    window.open('/downloads/' + response.path.split('/').pop(), '_blank');
+                    button.prop('disabled', false).html(originalText);
+                }, 1000);
+            } else {
+                button.html('<i class="bi bi-x-circle"></i> Ошибка!').addClass('btn-danger');
+                setTimeout(() => {
+                    button.prop('disabled', false).html(originalText).removeClass('btn-danger');
+                }, 2000);
+            }
+        }).fail(function() {
+            button.html('<i class="bi bi-x-circle"></i> Ошибка!').addClass('btn-danger');
+            setTimeout(() => {
+                button.prop('disabled', false).html(originalText).removeClass('btn-danger');
+            }, 2000);
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

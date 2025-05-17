@@ -1,0 +1,466 @@
+openapi: 3.0.0
+info:
+  title: Media Downloader API
+  description: API for searching and downloading media from YouTube and Yandex.Music
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+paths:
+  /:
+    get:
+      tags: [UI]
+      summary: Home Page
+      responses:
+        200:
+          description: HTML of the home page
+
+  /youtube:
+    get:
+      tags: [UI]
+      summary: YouTube Search Page
+      responses:
+        200:
+          description: HTML of the YouTube search page
+
+  /yandex:
+    get:
+      tags: [UI]
+      summary: Yandex.Music Search Page
+      responses:
+        200:
+          description: HTML of the Yandex.Music search page
+
+  /api/download:
+    post:
+      tags: [API]
+      summary: Download media by URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                type:
+                  type: string
+                  enum: [video, audio]
+                  default: video
+                format:
+                  type: string
+                  enum: [mp4, mp3]
+                  default: mp4
+      responses:
+        200:
+          description: Successful download
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  path:
+                    type: string
+                  filename:
+                    type: string
+        400:
+          description: Invalid request parameters
+        500:
+          description: Server error
+
+  /api/youtube/search:
+    get:
+      tags: [API]
+      summary: Search videos on YouTube
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+      responses:
+        200:
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    video_id:
+                      type: string
+                    video_title:
+                      type: string
+                    channel_id:
+                      type: string
+                    channel_title:
+                      type: string
+                    video_duration:
+                      type: string
+                    video_url:
+                      type: string
+        400:
+          description: Search query not specified
+
+  /api/yandex/search:
+    get:
+      tags: [API]
+      summary: Search tracks on Yandex.Music
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+      responses:
+        200:
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    track_id:
+                      type: string
+                    track_title:
+                      type: string
+                    author:
+                      type: string
+                    track_url:
+                      type: string
+        400:
+          description: Search query not specified
+
+  /downloads/{filename}:
+    get:
+      tags: [API]
+      summary: Download file
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: File for download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        404:
+          description: File not found
+
+  /api/youtube/video:
+    get:
+      tags: [API]
+      summary: Get YouTube video info by URL
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+          description: YouTube video URL
+      responses:
+        200:
+          description: Video information
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    video_id:
+                      type: string
+                    video_title:
+                      type: string
+                    channel_id:
+                      type: string
+                    channel_title:
+                      type: string
+                    video_duration:
+                      type: string
+                    video_publishtime:
+                      type: string
+                    video_views:
+                      type: string
+                    video_thumbnails:
+                      type: object
+                    video_url:
+                      type: string
+        400:
+          description: URL parameter not specified
+
+  /api/yandex/track:
+    get:
+      tags: [API]
+      summary: Get Yandex.Music track info by URL
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Yandex.Music track URL
+      responses:
+        200:
+          description: Track information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  artists:
+                    type: array
+                    items:
+                      type: string
+                  album:
+                    type: string
+                  duration:
+                    type: integer
+                  cover_url:
+                    type: string
+                  url:
+                    type: string
+        400:
+          description: URL parameter not specified
+        404:
+          description: Track not found
+
+  /api/youtube/trending:
+    get:
+      tags: [API]
+      summary: Get trending YouTube videos
+      responses:
+        200:
+          description: List of trending videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YouTubeVideo'
+          
+  /api/yandex/popular:
+    get:
+      tags: [API]
+      summary: Get popular Yandex.Music tracks
+      responses:
+        200:
+          description: List of popular tracks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YandexTrack'
+
+  /api/youtube/search/filtered:
+    get:
+      tags: [YouTube]
+      summary: Search YouTube videos with filters
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Video title search query
+        - name: channel
+          in: query
+          schema:
+            type: string
+          description: Channel ID or name to filter by
+        - name: year
+          in: query
+          schema:
+            type: integer
+          description: Year to filter by
+        - name: duration
+          in: query
+          schema:
+            type: string
+            enum: [short, medium, long]
+          description: Video duration filter
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, date, viewCount, rating]
+          default: relevance
+          description: Sort order
+      responses:
+        200:
+          description: List of filtered videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YouTubeVideo'
+
+  /api/youtube/channel/search:
+    get:
+      tags: [YouTube]
+      summary: Search videos in specific channel
+      parameters:
+        - name: channel
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Channel name to search in
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Optional video title search query
+      responses:
+        200:
+          description: List of channel videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YouTubeVideo'
+
+  /api/yandex/search/filtered:
+    get:
+      tags: [Yandex]
+      summary: Search Yandex.Music tracks with filters
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: artist
+          in: query
+          schema:
+            type: string
+          description: Filter by artist name
+        - name: year
+          in: query
+          schema:
+            type: integer
+          description: Filter by release year
+        - name: genre
+          in: query
+          schema:
+            type: string
+          description: Filter by genre
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [year, rating, popularity]
+          default: year
+          description: Sort order
+      responses:
+        200:
+          description: List of filtered tracks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YandexTrack'
+  
+  /api/yandex/artist:
+    get:
+      tags: [Yandex]
+      summary: Search tracks by artist name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Artist name
+      responses:
+        200:
+          description: List of artist's tracks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YandexTrack'
+
+  /api/youtube/channel:
+    get:
+      tags: [YouTube]
+      summary: Search videos by channel name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Channel name
+      responses:
+        200:
+          description: List of channel's videos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YouTubeVideo'
+
+components:
+  schemas:
+    YouTubeVideo:
+      type: object
+      properties:
+        video_id:
+          type: string
+        video_title:
+          type: string
+        channel_id:
+          type: string
+        channel_title:
+          type: string
+        video_duration:
+          type: string
+        video_publishtime:
+          type: string
+        video_views:
+          type: string
+        video_thumbnails:
+          type: object
+        video_url:
+          type: string
+    YandexTrack:
+      type: object
+      properties:
+        track_id:
+          type: string
+        track_title:
+          type: string
+        author:
+          type: string
+        track_duration_ms:
+          type: integer
+        cover_uri:
+          type: string
+        track_url:
+          type: string

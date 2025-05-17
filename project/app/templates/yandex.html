@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Яндекс.Музыка{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <h2 class="mb-4">Поиск в Яндекс.Музыке</h2>
+    <div class="input-group mb-4">
+        <input type="text" id="searchQuery" class="form-control" placeholder="Введите название трека...">
+        <button id="searchBtn" class="btn btn-warning">Поиск</button>
+    </div>
+
+    <div class="mb-3">
+        <div class="btn-group w-100" role="group">
+            <button type="button" class="btn btn-outline-warning active" id="searchTracksBtn">
+                Поиск треков
+            </button>
+            <button type="button" class="btn btn-outline-warning" id="searchArtistBtn">
+                Поиск по исполнителю
+            </button>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <button class="btn btn-link" data-bs-toggle="collapse" data-bs-target="#filtersCollapse">
+                Фильтры поиска <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
+        <div class="collapse" id="filtersCollapse">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Исполнитель</label>
+                        <input type="text" id="artistFilter" class="form-control" placeholder="Имя исполнителя">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Год</label>
+                        <select id="yearFilter" class="form-select">
+                            <option value="">Любой год</option>
+                            {% for year in range(2023, 1950, -1) %}
+                            <option value="{{ year }}">{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Жанр</label>
+                        <select id="genreFilter" class="form-select">
+                            <option value="">Любой жанр</option>
+                            <option value="pop">Поп</option>
+                            <option value="rock">Рок</option>
+                            <option value="hiphop">Хип-хоп</option>
+                            <option value="electronic">Электроника</option>
+                            <option value="jazz">Джаз</option>
+                            <option value="classical">Классика</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Сортировка</label>
+                        <select id="sortFilter" class="form-select">
+                            <option value="year">По году</option>
+                            <option value="rating">По рейтингу</option>
+                            <option value="popularity">По популярности</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="popular-container mb-5" id="popularSection">
+        <h3 class="mb-3">Популярные треки</h3>
+        <div id="popularContainer" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            <!-- Популярные треки будут здесь -->
+        </div>
+    </div>
+
+    <div id="resultsContainer">
+        <!-- Результаты поиска будут здесь -->
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Загружаем популярные треки при загрузке страницы
+    loadPopularTracks();
+    let currentSearchMode = 'tracks';
+
+    $('#searchArtistBtn').click(function() {
+        currentSearchMode = 'artist';
+        $(this).addClass('active');
+        $('#searchTracksBtn').removeClass('active');
+        $('#searchQuery').attr('placeholder', 'Имя исполнителя...');
+        // Скрываем фильтр исполнителя
+        $('#artistFilter').closest('.col-md-4').addClass('filter-transition').slideUp();
+    });
+    
+    $('#searchTracksBtn').click(function() {
+        currentSearchMode = 'tracks';
+        $(this).addClass('active');
+        $('#searchArtistBtn').removeClass('active');
+        $('#searchQuery').attr('placeholder', 'Название трека...');
+        // Показываем фильтр исполнителя
+        $('#artistFilter').closest('.col-md-4').addClass('filter-transition').slideDown();
+    });
+
+    // Инициализация при загрузке
+    if(currentSearchMode === 'artist') {
+        $('#artistFilter').closest('.col-md-4').hide();
+    }
+    
+    function displayResults(data, isArtistSearch) {
+        let html = '';
+        if(data && data.length > 0) {
+            data.forEach(track => {
+                const duration = new Date(track.track_duration_ms).toISOString().substr(14, 5);
+                const coverUrl = track.cover_uri ? `https://${track.cover_uri.replace('%%', '200x200')}` : 'https://via.placeholder.com/200';
+                
+                html += `
+                <div class="card media-card mb-3">
+                    <div class="row g-0">
+                        <div class="col-md-3">
+                            <a href="${track.track_url}" target="_blank">
+                                <img src="${coverUrl}" class="img-fluid rounded-start">
+                            </a>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a href="${track.track_url}" target="_blank">${track.track_title}</a>
+                                </h5>
+                                <p class="card-text">
+                                    <small class="text-muted">${isArtistSearch ? track.author : (track.all_artists || track.author)}</small><br>
+                                    <small>${duration}</small>
+                                </p>
+                                <div class="d-flex justify-content-between">
+                                    <a href="${track.track_url}" class="btn btn-outline-warning" target="_blank">
+                                        <i class="bi bi-music-note-beamed"></i> Открыть
+                                    </a>
+                                    <button class="btn btn-warning download-btn" 
+                                        data-url="${track.track_url}" data-type="audio">
+                                        <i class="bi bi-download"></i> MP3
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+        } else {
+            html = `
+            <div class="text-center py-4">
+                <div class="alert alert-warning">
+                    Ничего не найдено
+                </div>
+                <button class="btn btn-outline-primary" onclick="$('#popularSection').show(); $('#resultsContainer').empty();">
+                    Показать популярные треки
+                </button>
+            </div>`;
+        }
+
+        $('#resultsContainer').html(html);
+        bindDownloadButtons();
+    }
+
+
+    function loadPopularTracks() {
+        $('#popularContainer').html('<div class="col-12 text-center py-4"><div class="spinner-border text-warning" role="status"><span class="visually-hidden">Загрузка...</span></div></div>');
+        
+        $.get('/api/yandex/popular', function(data) {
+            let html = '';
+            if(data && data.length > 0) {
+                data.forEach(track => {
+                    const duration = new Date(track.track_duration_ms).toISOString().substr(14, 5);
+                    const coverUrl = track.cover_uri ? `https://${track.cover_uri.replace('%%', '300x300')}` : 'https://via.placeholder.com/300';
+                    
+                    html += `
+                    <div class="col">
+                        <div class="card h-100">
+                            <a href="${track.track_url}" target="_blank">
+                                <img src="${coverUrl}" class="card-img-top">
+                            </a>
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <a href="${track.track_url}" target="_blank">${track.track_title}</a>
+                                </h5>
+                                <p class="card-text text-muted">${track.author}</p>
+                                <p class="card-text"><small>${duration}</small></p>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <button class="btn btn-sm btn-warning download-btn" 
+                                    data-url="${track.track_url}" data-type="audio">
+                                    <i class="bi bi-download"></i> MP3
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html = '<div class="col-12 text-center py-4">Не удалось загрузить популярные треки</div>';
+            }
+            $('#popularContainer').html(html);
+            bindDownloadButtons();
+        }).fail(function() {
+            $('#popularContainer').html('<div class="col-12 text-center py-4">Ошибка при загрузке популярных треков</div>');
+        });
+    }
+
+    $('#searchBtn').click(searchYandex);
+    $('#searchQuery').keypress(function(e) {
+        if(e.which == 13) searchYandex();
+    });
+
+    function searchYandex() {
+        const query = $('#searchQuery').val().trim();
+        const artist = $('#artistFilter').val().trim();
+        
+        if(!query && !artist) {
+            loadPopularTracks();
+            return;
+        }
+
+        $('#popularSection').hide();
+        $('#resultsContainer').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-warning" role="status"></div>
+                <p class="mt-2">Ищем ${artist ? 'исполнителя: ' + artist : ''} ${query ? 'по запросу: ' + query : ''}</p>
+            </div>
+        `);
+
+        if(currentSearchMode === 'artist') {
+            $.get('/api/yandex/artist', { q: artist || query }, function(data) {
+                displayResults(data, true);
+            }).fail(showSearchError);
+            } else {
+            $.get('/api/yandex/search/filtered', {
+                q: query,
+                artist: artist,
+                year: $('#yearFilter').val(),
+                genre: $('#genreFilter').val(),
+                sort: $('#sortFilter').val()
+            }, function(data) {
+                displayResults(data, false);
+            }).fail(showSearchError);
+        }
+    }
+
+    function bindDownloadButtons() {
+        $('.download-btn').click(function() {
+            const url = $(this).data('url');
+            const type = $(this).data('type');
+            downloadMedia(url, type);
+        });
+    }
+
+    function showSearchError() {
+        $('#resultsContainer').html(`
+            <div class="alert alert-danger">
+                Ошибка при выполнении поиска. Попробуйте позже.
+            </div>
+        `);
+    }   
+
+    function downloadMedia(url, type) {
+        const button = $(`.download-btn[data-url="${url}"]`);
+        const originalText = button.html();
+    
+        button.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Скачивание...');
+        
+        $.post('/api/download', {
+            url: url,
+            type: type,
+            format: 'mp3'
+        }, function(response) {
+            if(response.success) {
+                button.html('<i class="bi bi-check-circle"></i> Скачано!');
+                setTimeout(() => {
+                    window.open('/downloads/' + response.path.split('/').pop(), '_blank');
+                    button.prop('disabled', false).html(originalText);
+                }, 1000);
+            } else {
+                button.html('<i class="bi bi-x-circle"></i> Ошибка!').addClass('btn-danger');
+                setTimeout(() => {
+                    button.prop('disabled', false).html(originalText).removeClass('btn-danger');
+                }, 2000);
+            }
+        }).fail(function() {
+            button.html('<i class="bi bi-x-circle"></i> Ошибка!').addClass('btn-danger');
+            setTimeout(() => {
+                button.prop('disabled', false).html(originalText).removeClass('btn-danger');
+            }, 2000);
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
